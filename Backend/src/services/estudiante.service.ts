@@ -328,3 +328,77 @@ export const actualizarPerfil = async (rutActual: string, datos: Partial<CrearEs
   });
 };
 
+export const obtenerHistorialAyudantias = async (rut: string) => {
+  const rutNormalizado = rut.trim().toUpperCase();
+
+  const usuario = await prisma.usuario.findFirst({
+    where: {
+      rut: { equals: rutNormalizado, mode: 'insensitive' },
+    },
+    select: {
+      id: true,
+      nombre: true,
+      apellido: true,
+      rut: true,
+      rol: true,
+      inscripciones: {
+        select: {
+          id: true,
+          taller: {
+            select: {
+              id: true,
+              nombre: true,
+              semestre: true,
+              horario: true,
+              dia: true,
+              bloque: true,
+              lugar: true,
+              estado: true,
+              profesor: {
+                select: {
+                  nombre: true,
+                  apellido: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          taller: {
+            semestre: 'desc', 
+          },
+        },
+      },
+    },
+  });
+
+  if (!usuario) {
+    throw { status: 404, message: 'Estudiante no encontrado.' };
+  }
+
+  const historial = usuario.inscripciones.map((item: any) => ({
+    tallerId: item.taller.id,
+    taller: item.taller.nombre,
+    semestre: item.taller.semestre,
+    horario: item.taller.horario,
+    dia: item.taller.dia,
+    bloque: item.taller.bloque,
+    lugar: item.taller.lugar,
+    activo: item.taller.estado,
+    profesor: item.taller.profesor
+      ? `${item.taller.profesor.nombre} ${item.taller.profesor.apellido}`
+      : null,
+  }));
+
+  return {
+    estudiante: {
+      id: usuario.id,
+      nombre: usuario.nombre,
+      apellido: usuario.apellido,
+      rut: usuario.rut,
+      rol: usuario.rol,
+    },
+    totalAyudantias: historial.length,
+    historial,
+  };
+};
