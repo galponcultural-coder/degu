@@ -10,6 +10,18 @@ router.post('/', middlewareVerificarAdmin, validate(schema.crearEstudianteSchema
 router.post('/batch', middlewareVerificarAdmin, ctrl.crearEstudiantesBatch);
 //router.get('/', validate(schema.buscarEstudianteSchema), ctrl.listarEstudiantes);
 router.get('/buscar', middlewareVerificarAdmin, ctrl.buscarEstudiantesController);
+router.patch(
+  '/:rut',
+  middlewareVerificarAdmin,
+  validate(schema.actualizarEstudianteSchema),
+  ctrl.modificarDatos
+);
+router.get(
+  '/:rut/ayudantias',
+  middlewareVerificarAdmin,
+  validate(schema.rutParamSchema),
+  ctrl.obtenerHistorialAyudantias
+);
 //router.get('/:rut', validate(schema.rutParamSchema), ctrl.obtenerPerfil);
 //router.get('/:rut/historial', validate(schema.rutParamSchema), ctrl.obtenerHistorial);
 //router.patch('/:rut', validate(schema.actualizarEstudianteSchema), ctrl.modificarDatos);

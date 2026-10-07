@@ -125,9 +125,18 @@ export const modificarDatos = async (req: Request, res: Response) => {
   try {
     const rut = String(req.params.rut);
     const actualizado = await service.actualizarPerfil(rut, req.body);
-    res.json(actualizado);
-  } catch (error) {
-    res.status(400).json({ error: 'Error al actualizar' });
+
+    return res.status(200).json({
+      mensaje: 'Datos del estudiante actualizados con éxito.',
+      usuario: actualizado,
+    });
+  } catch (error: any) {
+    const status = error.status || 500;
+    const message = error.message || 'Error al actualizar los datos del estudiante.';
+    return res.status(status).json({
+      error: message,
+      detalle: message,
+    });
   }
 };
 
@@ -136,7 +145,7 @@ export const cambiarRol = async (req: Request, res: Response) => {
     const { rut } = req.params;
     const { rol } = req.body;
     
-    const actualizado = await service.actualizarRol(rut as string, rol);
+    const actualizado = await service.actualizarPerfil(rut as string, rol);
     res.json(actualizado);
   } catch (error: any) {
     console.error("=== ERROR REAL AL CAMBIAR ROL ===", error); 
@@ -145,6 +154,22 @@ export const cambiarRol = async (req: Request, res: Response) => {
       error: 'Error al cambiar rol', 
       detalle: error.message,
       codigoPrisma: error.code 
+    });
+  }
+};
+
+export const obtenerHistorialAyudantias = async (req: Request, res: Response) => {
+  try {
+    const rut = String(req.params.rut);
+    const resultado = await service.obtenerHistorialAyudantias(rut);
+
+    return res.status(200).json(resultado);
+  } catch (error: any) {
+    const status = error.status || 500;
+    const message = error.message || 'Error al obtener el historial de ayudantías.';
+    return res.status(status).json({
+      error: message,
+      detalle: message,
     });
   }
 };

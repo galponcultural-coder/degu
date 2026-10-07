@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import { RolUsuario, Prisma } from '@prisma/client'
 
 const RUT_REGEX = /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface BuscarEstudiantesParams {
   query: string;
@@ -37,20 +38,35 @@ export const obtenerTodos = async (busqueda?: string) => {
   });
 };
 
+
 export async function crearEstudiante(input: CrearEstudianteInput) {
-  const { nombre, apellido, rut, correo, password, carrera, telefono } = input;
+  const nombre = input.nombre.trim();
+  const apellido = input.apellido.trim();
+  const rut = input.rut.trim().toUpperCase();
+  const correo = input.correo.trim().toLowerCase();
+  const { password, carrera, telefono } = input;
+
+  if (!RUT_REGEX.test(rut)) {
+    throw { status: 400, message: 'El formato del RUT es inválido (Ej: 12.345.678-9).' };
+  }
+
+  if (!EMAIL_REGEX.test(correo)) {
+    throw { status: 400, message: 'El formato del correo electrónico es inválido.' };
+  }
 
   const usuarioExistente = await prisma.usuario.findFirst({
     where: {
-      OR: [{ rut }, { correo }],
+      OR: [
+        { rut: { equals: rut, mode: 'insensitive' } },
+        { correo: { equals: correo, mode: 'insensitive' } }
+      ],
     },
   });
 
   if (usuarioExistente) {
-    if (usuarioExistente.rut === rut) {
+    if (usuarioExistente.rut.toUpperCase() === rut) {
       throw { status: 409, message: 'Ya existe un usuario registrado con ese RUT.' };
     }
-
     throw { status: 409, message: 'Ya existe un usuario registrado con ese correo.' };
   }
 
@@ -64,8 +80,8 @@ export async function crearEstudiante(input: CrearEstudianteInput) {
       rut,
       correo,
       password: passwordHasheada,
-      carrera: carrera,
-      telefono: telefono,
+      carrera: carrera?.trim(),
+      telefono: telefono?.trim(),
       rol: RolUsuario.Estudiante,
     },
     select: {
@@ -97,8 +113,8 @@ export async function crearEstudiantesBatch(inputs: CrearEstudianteInput[]) {
     select: { rut: true, correo: true },
   });
 
-  const rutsExistentes = new Set(existentes.map(u => u.rut));
-  const correosExistentes = new Set(existentes.map(u => u.correo));
+  const rutsExistentes = new Set(existentes.map((u: { rut: string; correo: string }) => u.rut));
+  const correosExistentes = new Set(existentes.map((u: { rut: string; correo: string }) => u.correo));
 
   const validos: CrearEstudianteInput[] = [];
   const errores: { input: CrearEstudianteInput; message: string }[] = [];
@@ -236,39 +252,153 @@ export const obtenerHistorialAsistencia = async (rut: string) => {
   return estudianteConAsistencias.asistencias;
 };
 
-export const actualizarPerfil = async (rut: string, datos: any) => {
-  const updateData = { ...datos };
-  if (updateData.password) {
-    const salt = await bcrypt.genSalt(10);
-    updateData.password = await bcrypt.hash(updateData.password, salt);
-  }
+export const actualizarPerfil = async (rutActual: string, datos: Partial<CrearEstudianteInput>) => {
+  const { rut: nuevoRut, correo: nuevoCorreo, password, nombre, apellido, carrera, telefono } = datos;
 
-  return await prisma.usuario.update({
-    where: { rut },
-    data: updateData,
-    select: { id: true, nombre: true, apellido: true, rut: true, correo: true }
+  const estudianteActual = await prisma.usuario.findUnique({
+    where: { rut: rutActual }
   });
-};
 
-export const actualizarRol = async (rut: string, nuevoRol: string) => {
-  const rolFormateado = nuevoRol.charAt(0).toUpperCase() + nuevoRol.slice(1).toLowerCase();
+  if (!estudianteActual) {
+    throw { status: 404, message: 'Estudiante no encontrado.' };
+  }
 
-  const esRolValido = Object.values(RolUsuario).includes(rolFormateado as RolUsuario);
+  if (nuevoRut !== undefined && !RUT_REGEX.test(nuevoRut.trim())) {
+    throw { status: 400, message: 'El formato del RUT es inválido (Ej: 12.345.678-9).' };
+  }
 
-  if (!esRolValido) {
-    throw new Error(`El valor "${nuevoRol}" no es un rol permitido.`);
+  if (nuevoCorreo !== undefined && !EMAIL_REGEX.test(nuevoCorreo.trim())) {
+    throw { status: 400, message: 'El formato del correo electrónico es inválido.' };
+  }
+
+  if (nuevoRut || nuevoCorreo) {
+    const rutNormalizado = nuevoRut?.trim().toUpperCase();
+    const correoNormalizado = nuevoCorreo?.trim().toLowerCase();
+
+    const usuarioConflicto = await prisma.usuario.findFirst({
+      where: {
+        AND: [
+          { id: { not: estudianteActual.id } }, // Excluye al estudiante que estamos editando
+          {
+            OR: [
+              ...(rutNormalizado ? [{ rut: rutNormalizado }] : []),
+              ...(correoNormalizado ? [{ correo: { equals: correoNormalizado, mode: 'insensitive' as const } }] : []),
+            ],
+          },
+        ],
+      },
+    });
+
+    if (usuarioConflicto) {
+      if (rutNormalizado && usuarioConflicto.rut.toUpperCase() === rutNormalizado) {
+        throw { status: 409, message: 'Ya existe otro usuario registrado con ese RUT.' };
+      }
+      if (correoNormalizado && usuarioConflicto.correo.toLowerCase() === correoNormalizado) {
+        throw { status: 409, message: 'Ya existe otro usuario registrado con ese correo.' };
+      }
+    }
+  }
+
+  const updateData: Prisma.UsuarioUpdateInput = {};
+  if (nombre !== undefined) updateData.nombre = nombre.trim();
+  if (apellido !== undefined) updateData.apellido = apellido.trim();
+  if (nuevoRut !== undefined) updateData.rut = nuevoRut.trim().toUpperCase();
+  if (nuevoCorreo !== undefined) updateData.correo = nuevoCorreo.trim().toLowerCase();
+  if (carrera !== undefined) updateData.carrera = carrera.trim();
+  if (telefono !== undefined) updateData.telefono = telefono.trim();
+
+  if (password) {
+    const salt = await bcrypt.genSalt(10);
+    updateData.password = await bcrypt.hash(password, salt);
   }
 
   return await prisma.usuario.update({
-    where: { rut },
-    data: { 
-      rol: rolFormateado as RolUsuario 
-    },
-    select: { 
-      id: true, 
-      nombre: true, 
-      rol: true 
+    where: { id: estudianteActual.id },
+    data: updateData,
+    select: {
+      id: true,
+      nombre: true,
+      apellido: true,
+      rut: true,
+      correo: true,
+      carrera: true,
+      telefono: true,
+      rol: true,
     }
   });
 };
 
+export const obtenerHistorialAyudantias = async (rut: string) => {
+  const rutNormalizado = rut.trim().toUpperCase();
+
+  const usuario = await prisma.usuario.findFirst({
+    where: {
+      rut: { equals: rutNormalizado, mode: 'insensitive' },
+    },
+    select: {
+      id: true,
+      nombre: true,
+      apellido: true,
+      rut: true,
+      rol: true,
+      inscripciones: {
+        select: {
+          id: true,
+          taller: {
+            select: {
+              id: true,
+              nombre: true,
+              semestre: true,
+              horario: true,
+              dia: true,
+              bloque: true,
+              lugar: true,
+              estado: true,
+              profesor: {
+                select: {
+                  nombre: true,
+                  apellido: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          taller: {
+            semestre: 'desc', 
+          },
+        },
+      },
+    },
+  });
+
+  if (!usuario) {
+    throw { status: 404, message: 'Estudiante no encontrado.' };
+  }
+
+  const historial = usuario.inscripciones.map((item: any) => ({
+    tallerId: item.taller.id,
+    taller: item.taller.nombre,
+    semestre: item.taller.semestre,
+    horario: item.taller.horario,
+    dia: item.taller.dia,
+    bloque: item.taller.bloque,
+    lugar: item.taller.lugar,
+    activo: item.taller.estado,
+    profesor: item.taller.profesor
+      ? `${item.taller.profesor.nombre} ${item.taller.profesor.apellido}`
+      : null,
+  }));
+
+  return {
+    estudiante: {
+      id: usuario.id,
+      nombre: usuario.nombre,
+      apellido: usuario.apellido,
+      rut: usuario.rut,
+      rol: usuario.rol,
+    },
+    totalAyudantias: historial.length,
+    historial,
+  };
+};
