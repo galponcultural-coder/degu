@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+// Formato esperado en tu sistema: 12.345.678-9 o 1.234.567-K
+const RUT_REGEX = /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/;
+
 export const rutParamSchema = z.object({
   params: z.object({
     rut: z.string().min(1, "El RUT es obligatorio"),
@@ -14,25 +17,49 @@ export const buscarEstudianteSchema = z.object({
 
 export const actualizarEstudianteSchema = z.object({
   params: z.object({
-    rut: z.string().min(1),
+    rut: z.string().min(1, "El RUT actual en la URL es obligatorio"),
   }),
   body: z.object({
-    nombre: z.string().optional(),
-    apellido: z.string().optional(),
-    correo: z.string().email("Formato de correo inválido").optional(),
-    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").optional(),
+    nombre: z.string().trim().min(1, "El nombre no puede estar vacío").optional(),
+    apellido: z.string().trim().min(1, "El apellido no puede estar vacío").optional(),
+    rut: z
+      .string()
+      .trim()
+      .regex(RUT_REGEX, "Formato de RUT inválido (Ej: 12.345.678-9)")
+      .optional(),
+    correo: z
+      .string()
+      .trim()
+      .email("Formato de correo electrónico inválido")
+      .optional(),
+    carrera: z.string().trim().min(1, "La carrera no puede estar vacía").optional(),
+    telefono: z.string().trim().min(1, "El teléfono no puede estar vacío").optional(),
+    password: z
+      .string()
+      .min(6, "La contraseña debe tener al menos 6 caracteres")
+      .optional(),
   })
 });
 
 export const crearEstudianteSchema = z.object({
   body: z.object({
-    nombre: z.string().min(1, "El nombre es obligatorio"),
-    apellido: z.string().min(1, "El apellido es obligatorio"),
-    rut: z.string().min(1, "El RUT es obligatorio"),
-    correo: z.string().email("Formato de correo inválido"),
-    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres").optional(),
-    carrera: z.string().optional(),
-    telefono: z.string().optional(),
+    nombre: z.string().trim().min(1, "El nombre es obligatorio"),
+    apellido: z.string().trim().min(1, "El apellido es obligatorio"),
+    rut: z
+      .string()
+      .trim()
+      .min(1, "El RUT es obligatorio")
+      .regex(RUT_REGEX, "Formato de RUT inválido (Ej: 12.345.678-9)"),
+    correo: z
+      .string()
+      .trim()
+      .email("Formato de correo electrónico inválido"),
+    password: z
+      .string()
+      .min(6, "La contraseña debe tener al menos 6 caracteres")
+      .optional(),
+    carrera: z.string().trim().optional(),
+    telefono: z.string().trim().optional(),
   })
 });
 
