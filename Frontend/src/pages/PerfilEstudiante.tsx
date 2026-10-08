@@ -12,6 +12,8 @@ import { obtenerTalleresPorSemestre, type TallerApi } from "../services/talleres
 import { inscribirEstudiantesBatch } from "../services/inscripcion.service"
 import { obtenerSemestreActual } from "../utils/semestre.utils"
 
+import { obtenerHistorialAyudantias } from "../services/estudiantes.service"
+import type { AyudantiaItem } from "../interfaces/Estudiante"
 
 export interface EstudiantePerfil {
   id?: number
@@ -89,6 +91,9 @@ export default function Perfil({ estudiante, historialTalleres }: PerfilProps): 
   const [errorInscripcion, setErrorInscripcion] = useState<string | null>(null)
   const [exitoInscripcion, setExitoInscripcion] = useState<string | null>(null)
   const [triggerRecarga, setTriggerRecarga] = useState(0)
+  const [ayudantias, setAyudantias] = useState<AyudantiaItem[]>([])
+  const [cargandoAyudantias, setCargandoAyudantias] = useState(false)
+  const [errorAyudantias, setErrorAyudantias] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadTalleres() {
@@ -121,6 +126,17 @@ export default function Perfil({ estudiante, historialTalleres }: PerfilProps): 
     () => talleresDisponibles.filter((t) => t.nombre === tallerParaInscribir).map((t) => t.id),
     [talleresDisponibles, tallerParaInscribir]
   )
+
+  // Historial de ayudantías agrupado por semestre (más recientes primero)
+  const ayudantiasPorSemestre = useMemo(() => {
+    const grupos = new Map<string, AyudantiaItem[]>()
+    for (const a of ayudantias) {
+      const lista = grupos.get(a.semestre) ?? []
+      lista.push(a)
+      grupos.set(a.semestre, lista)
+    }
+    return Array.from(grupos.entries()).sort(([a], [b]) => b.localeCompare(a))
+  }, [ayudantias])
 
   const handleInscribir = async () => {
     if (!estudianteFinal?.id || !tallerParaInscribir || idsDelTallerElegido.length === 0) return
@@ -202,6 +218,34 @@ export default function Perfil({ estudiante, historialTalleres }: PerfilProps): 
       activo = false
     }
   }, [estudianteBase, triggerRecarga])
+
+  useEffect(() => {
+    if (!estudianteBase?.rut) return
+
+    let activo = true
+
+    async function cargarAyudantias() {
+      try {
+        setCargandoAyudantias(true)
+        setErrorAyudantias(null)
+        const data = await obtenerHistorialAyudantias(estudianteBase!.rut)
+        if (!activo) return
+        setAyudantias(data.historial)
+      } catch (err) {
+        if (!activo) return
+        setAyudantias([])
+        setErrorAyudantias(err instanceof Error ? err.message : "Error al cargar las ayudantías")
+      } finally {
+        if (activo) setCargandoAyudantias(false)
+      }
+    }
+
+    cargarAyudantias()
+
+    return () => {
+      activo = false
+    }
+  }, [estudianteBase?.rut])
 
   const manejarExportacionExcel = async () => {
     if (!estudianteFinal) return
@@ -316,12 +360,11 @@ export default function Perfil({ estudiante, historialTalleres }: PerfilProps): 
                     </article>
                   </div>
                   <article className="rounded-xl border border-[#dfe3e7] bg-white p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-[#68727d]">Teléfono</p>
-                      <p className="mt-1 text-[#2f363d]">{estudianteFinal.telefono}</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#68727d]">Teléfono</p>
+                    <p className="mt-1 text-[#2f363d]">{estudianteFinal.telefono}</p>
                   </article>
 
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-
                     <article className="rounded-xl border border-[#dfe3e7] bg-white p-4">
                       <p className="text-xs font-semibold uppercase tracking-wider text-[#68727d]">Talleres Inscritos</p>
                       <p className="mt-1 text-xl font-semibold text-[#2f363d]">
@@ -342,13 +385,13 @@ export default function Perfil({ estudiante, historialTalleres }: PerfilProps): 
                     <div className="mt-6 p-5 bg-white border border-[#dfe3e7] rounded-xl shadow-sm">
                       <h3 className="text-base font-semibold text-[#2f363d] mb-2">Inscribir en un nuevo taller</h3>
                       <p className="text-xs text-gray-500 mb-4">Inscribe al estudiante en alguno de los talleres dictados en este semestre.</p>
-                      
+
                       {errorInscripcion && (
                         <div className="mb-3 p-3 bg-red-50 text-red-700 text-sm rounded border border-red-200">
                           {errorInscripcion}
                         </div>
                       )}
-                      
+
                       {exitoInscripcion && (
                         <div className="mb-3 p-3 bg-green-50 text-green-700 text-sm rounded border border-green-200">
                           {exitoInscripcion}
@@ -370,10 +413,10 @@ export default function Perfil({ estudiante, historialTalleres }: PerfilProps): 
                         </select>
 
                         {tallerParaInscribir && idsDelTallerElegido.length > 1 && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Se inscribirá en los {idsDelTallerElegido.length} bloques de este taller.
-                            </p>
-                          )}
+                          <p className="text-xs text-gray-500 mt-1">
+                            Se inscribirá en los {idsDelTallerElegido.length} bloques de este taller.
+                          </p>
+                        )}
                         <button
                           onClick={handleInscribir}
                           disabled={!tallerParaInscribir || cargandoInscripcion}
@@ -458,6 +501,69 @@ export default function Perfil({ estudiante, historialTalleres }: PerfilProps): 
                   onCerrar={() => setModoEdicion(false)}
                 />
               )}
+
+              <section className="mt-4 rounded-2xl border border-[#dfe3e7] bg-gradient-to-b from-[#f6f7f8] to-[#fcfcfd] p-5 shadow-[0_8px_22px_-18px_rgba(31,35,40,0.28)]">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-[#2f363d]">Ayudante</h2>
+                  <span className="text-sm font-medium text-[#5a636d]">Total: {ayudantias.length}</span>
+                </div>
+
+                {cargandoAyudantias && (
+                  <p className="text-sm text-[#5a636d]">Cargando ayudantías...</p>
+                )}
+
+                {errorAyudantias && !cargandoAyudantias && (
+                  <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                    {errorAyudantias}
+                  </div>
+                )}
+
+                {!cargandoAyudantias && !errorAyudantias && ayudantias.length === 0 && (
+                  <p className="rounded-xl border border-dashed border-[#cfd7df] bg-white p-4 text-sm text-[#5a636d]">
+                    No hay ayudantías.
+                  </p>
+                )}
+
+                {ayudantias.length > 0 && (
+                  <div className="grid gap-5">
+                    {ayudantiasPorSemestre.map(([semestre, items]) => (
+                      <div key={semestre}>
+                        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-[#68727d]">
+                          Semestre {semestre}
+                        </h3>
+
+                        <div className="grid gap-3">
+                          {items.map((a) => (
+                            <article
+                              key={`${a.tallerId}-${a.dia}-${a.bloque}`}
+                              className="rounded-xl border border-[#dfe3e7] bg-white p-4 transition hover:-translate-y-[1px] hover:border-[#b7c2cd] hover:shadow-[0_10px_20px_-16px_rgba(31,35,40,0.34)]"
+                            >
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                  <h4 className="text-base font-semibold text-[#2f363d]">{a.taller}</h4>
+                                  <p className="mt-1 text-sm text-[#5a636d]">
+                                    {a.dia} · Bloque {a.bloque} · {a.horario}
+                                  </p>
+                                </div>
+
+                                <div className="text-sm text-[#5a636d] sm:text-right">
+                                  <p>
+                                    <span className="font-semibold text-[#2f363d]">Lugar:</span> {a.lugar}
+                                  </p>
+                                  <p className="mt-1">
+                                    <span className="font-semibold text-[#2f363d]">Profesor:</span>{" "}
+                                    {a.profesor ?? "Sin asignar"}
+                                  </p>
+                                </div>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
             </>
           )}
         </section>
