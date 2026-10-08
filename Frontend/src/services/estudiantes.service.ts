@@ -3,6 +3,7 @@ import type {
   ActualizarEstudianteResponse,
   BusquedaEstudiantesResponse,
   CrearEstudianteInput,
+  HistorialAyudantiasResponse,
   RegistroUsuarioPayload,
   RegistroUsuarioResponse,
   RespuestaCrearEstudiantesBatch,
@@ -104,4 +105,26 @@ export async function actualizarEstudiante(
   }
 
   return data as ActualizarEstudianteResponse;
+}
+export async function obtenerHistorialAyudantias(
+  rut: string
+): Promise<HistorialAyudantiasResponse> {
+  const token = localStorage.getItem("token");
+  const headers: HeadersInit = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetch(
+    `${baseUrl}/estudiantes/${encodeURIComponent(rut)}/ayudantias`,
+    { headers }
+  );
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || data.message || data.detalle || 'Error al obtener el historial de ayudantías'
+    );
+  }
+
+  return data as HistorialAyudantiasResponse;
 }
