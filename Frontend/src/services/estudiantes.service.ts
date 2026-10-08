@@ -1,76 +1,15 @@
-import type { Estudiante } from '../interfaces/Estudiante';
+import type {
+  ActualizarEstudiantePayload,
+  ActualizarEstudianteResponse,
+  BusquedaEstudiantesResponse,
+  CrearEstudianteInput,
+  RegistroUsuarioPayload,
+  RegistroUsuarioResponse,
+  RespuestaCrearEstudiantesBatch,
+} from '../interfaces/Estudiante';
+
 const baseUrl = import.meta.env.VITE_API_URL;
 
-
-export interface BusquedaEstudiantesResponse {
-  data: Estudiante[];
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-  };
-}
-
-export interface RegistroUsuarioPayload {
-  nombre: string
-  apellido: string
-  rut: string
-  correo: string
-  password?: string
-  rol: 'Administrador' | 'Profesor' | 'Ayudante' | 'Estudiante'
-  carrera?: string
-  telefono?: string
-}
-
-export interface RegistroUsuarioResponse {
-  mensaje: string
-  usuario: {
-    id: number
-    nombre: string
-    apellido: string
-    rut: string
-    correo: string
-    rol: string
-    carrera?: string
-    telefono?: string
-  }
-}
-
-export interface CrearEstudianteInput {
-  nombre: string;
-  apellido: string;
-  rut: string;
-  correo: string;
-  carrera: string;
-  telefono: string;
-  rol: string;
-  password?: string;
-}
-
-export interface EstudianteCreado {
-  id: number;
-  nombre: string;
-  apellido: string;
-  rut: string;
-  correo: string;
-  carrera: string;
-  telefono: string;
-  rol: string;
-}
-
-interface ErrorCreacion {
-  input: CrearEstudianteInput;
-  message: string;
-}
-
-interface RespuestaCrearEstudiantesBatch {
-  mensaje: string;
-  creados: EstudianteCreado[];
-  errores: ErrorCreacion[];
-}
 
 export async function buscarEstudiantes(
   query: string,
@@ -141,4 +80,28 @@ export async function registrarEstudiantesBatch(
   }
 
   return data as RespuestaCrearEstudiantesBatch;
+}
+
+export async function actualizarEstudiante(
+  rutActual: string,
+  payload: ActualizarEstudiantePayload
+): Promise<ActualizarEstudianteResponse> {
+  const token = localStorage.getItem("token");
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const response = await fetch(
+    `${baseUrl}/estudiantes/${encodeURIComponent(rutActual)}`,
+    { method: 'PATCH', headers, body: JSON.stringify(payload) }
+  );
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || data.message || data.detalle || 'Error al actualizar estudiante'
+    );
+  }
+
+  return data as ActualizarEstudianteResponse;
 }
