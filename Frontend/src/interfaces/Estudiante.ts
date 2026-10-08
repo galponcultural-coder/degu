@@ -75,3 +75,20 @@ export interface ActualizarEstudianteResponse {
   mensaje: string;
   usuario: EstudianteCreado;
 }
+export interface AyudantiaItem {
+  tallerId: number;
+  taller: string;
+  semestre: string;
+  horario: string;
+  dia: string;
+  bloque: string;
+  lugar: string;
+  activo: boolean | string; // viene de taller.estado; ajústalo al tipo real de tu schema
+  profesor: string | null;
+}
+
+export interface HistorialAyudantiasResponse {
+  estudiante: Pick<EstudianteCreado, 'id' | 'nombre' | 'apellido' | 'rut' | 'rol'>;
+  totalAyudantias: number;
+  historial: AyudantiaItem[];
+}
