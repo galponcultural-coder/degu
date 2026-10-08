@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactElement } from "react"
 import { Link, useLocation } from "react-router-dom"
 import Navbar from "../components/navbar"
+import ModalEditarDatos from "../components/modales/ModalEditarDatos"
 import {
   obtenerResumenAsistenciaEstudiante,
   type ResumenAsistenciaEstudianteItem,
@@ -76,6 +77,7 @@ export default function Perfil({ estudiante, historialTalleres }: PerfilProps): 
   const [estudianteFinal, setEstudianteFinal] = useState<EstudiantePerfil | null>(
     estudianteBase ?? null,
   )
+  const [modoEdicion, setModoEdicion] = useState(false)
   const [historialFinal, setHistorialFinal] = useState<ResumenTaller[]>(
     historialTalleres ?? [],
   )
@@ -267,6 +269,17 @@ export default function Perfil({ estudiante, historialTalleres }: PerfilProps): 
     return estudianteFinal.promedioAsistencia
   }, [estudianteFinal])
 
+  const guardarDatosEstudiante = (datos: {
+    nombre: string
+    apellido?: string
+    correo: string
+    carrera: string
+    telefono: string
+  }) => {
+    setEstudianteFinal((actual) => (actual ? { ...actual, ...datos } : actual))
+    setModoEdicion(false)
+  }
+
   return (
     <div>
       <Navbar />
@@ -311,7 +324,17 @@ export default function Perfil({ estudiante, historialTalleres }: PerfilProps): 
             <>
               <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
                 <section className="rounded-2xl border border-[#dfe3e7] bg-gradient-to-b from-[#f6f7f8] to-[#fcfcfd] p-5 shadow-[0_8px_22px_-18px_rgba(31,35,40,0.28)]">
-                  <h2 className="mb-4 text-lg font-semibold text-[#2f363d]">Información del estudiante</h2>
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <h2 className="text-lg font-semibold text-[#2f363d]">Información del estudiante</h2>
+                    <button
+                      type="button"
+                      onClick={() => setModoEdicion((activo) => !activo)}
+                      aria-pressed={modoEdicion}
+                      className="inline-flex items-center justify-center rounded-lg border border-[#cfd7df] bg-white px-4 py-2 text-sm font-semibold text-[#2f363d] transition hover:border-[#bfc8d1] hover:bg-[#f3f6f9]"
+                    >
+                      {modoEdicion ? "Desactivar modo edición" : "Activar modo edición"}
+                    </button>
+                  </div>
 
                   <div className="grid gap-3 sm:grid-cols-2 mb-3">
                     <article className="rounded-xl border border-[#dfe3e7] bg-white p-4">
@@ -471,6 +494,13 @@ export default function Perfil({ estudiante, historialTalleres }: PerfilProps): 
                   ))}
                 </div>
               </section>
+              {modoEdicion && estudianteFinal && (
+                <ModalEditarDatos
+                  estudiante={estudianteFinal}
+                  onGuardar={guardarDatosEstudiante}
+                  onCerrar={() => setModoEdicion(false)}
+                />
+              )}
 
               <section className="mt-4 rounded-2xl border border-[#dfe3e7] bg-gradient-to-b from-[#f6f7f8] to-[#fcfcfd] p-5 shadow-[0_8px_22px_-18px_rgba(31,35,40,0.28)]">
                 <div className="mb-4 flex items-center justify-between">
