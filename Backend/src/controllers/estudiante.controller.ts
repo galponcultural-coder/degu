@@ -161,12 +161,16 @@ export const cambiarRol = async (req: Request, res: Response) => {
 export const obtenerHistorialAyudantias = async (req: Request, res: Response) => {
   try {
     const rut = String(req.params.rut);
-    const resultado = await service.obtenerHistorialAyudantias(rut);
+    
+    const filtro = req.query.filtro ? String(req.query.filtro) : undefined;
+
+    const resultado = await service.obtenerHistorialAyudantias(rut, filtro);
 
     return res.status(200).json(resultado);
   } catch (error: any) {
     const status = error.status || 500;
     const message = error.message || 'Error al obtener el historial de ayudantías.';
+    
     return res.status(status).json({
       error: message,
       detalle: message,
