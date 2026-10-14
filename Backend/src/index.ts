@@ -4,6 +4,7 @@ import sesionRoutes from './routes/sesion.routes';
 import asistenciaRoutes from './routes/asistencia.routes';
 import authRoutes from './routes/auth.routes';
 import profesorRoutes from './routes/profesor.routes';
+import eventoRoutes from './routes/evento.routes';
 
 import estudianteRoutes from './routes/estudiante.routes';
 import adminRoutes from './routes/admin.routes';
@@ -52,7 +53,7 @@ app.use('/api/sesion', sesionRoutes);
 app.use('/api/asistencia', asistenciaRoutes)
 app.use('/api/auth', authRoutes);
 app.use("/api/profesores", profesorRoutes);
-
+app.use('/api/eventos', eventoRoutes);
 app.use('/api/estudiantes', estudianteRoutes);
 app.use('/api/admin', middlewareVerificarAdmin, adminRoutes);
 app.use('/api/metricas', metricaRoutes);

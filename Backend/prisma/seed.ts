@@ -202,6 +202,38 @@ async function main() {
       { sesionId: sesionFotografia.id, estudianteId: tomas.id, estado: "Presente", notaSatisfaccion: 4 },
     ]});
 
+    // =========================================================================
+    // NUEVO: CREACIÓN DE EVENTOS EXTERNOS PARA PRUEBAS
+    // =========================================================================
+    console.log('🎪 Creando Eventos Externos (Expo Geek)...');
+    await prisma.eventoExterno.createMany({
+      data: [
+        {
+          nombre: "Expo Geek 2026",
+          descripcion: "Convención anual de videojuegos, tecnología y cultura pop.",
+          fecha: new Date("2026-11-15T10:00:00Z"),
+          horario: "10:00 - 18:00",
+          lugar: "Patio Central UCN",
+          organizador: "Agrupación Geek UCN",
+          // Pre-cargamos algunos asistentes para tener datos base
+          asistentesEstudiantes: 120,
+          asistentesFuncionarios: 15,
+          asistentesExternos: 350
+        },
+        {
+          nombre: "Concierto Banda Universitaria",
+          descripcion: "Presentación de fin de semestre abierta a la comunidad.",
+          fecha: new Date("2026-12-01T19:00:00Z"),
+          horario: "19:00 - 21:00",
+          lugar: "Galpón Cultural",
+          organizador: "Dirección General Estudiantil",
+          asistentesEstudiantes: 0,
+          asistentesFuncionarios: 0,
+          asistentesExternos: 0
+        }
+      ]
+    });
+
     console.log('✅ Seed completado.');
     console.log('----------------------------------------------------');
     console.log('Inicia sesión con:');
