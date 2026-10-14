@@ -1,5 +1,4 @@
 import { prisma } from '../lib/prisma';
-import bcrypt from 'bcrypt';
 import { RolUsuario, Prisma } from '@prisma/client'
 
 const RUT_REGEX = /^\d{1,2}\.\d{3}\.\d{3}-[\dkK]$/;
@@ -16,7 +15,7 @@ interface CrearEstudianteInput {
   apellido: string;
   rut: string;
   correo: string;
-  password?: string;
+  // Ya no incluimos password
   carrera?: string;
   telefono?: string;
 }
@@ -44,7 +43,7 @@ export async function crearEstudiante(input: CrearEstudianteInput) {
   const apellido = input.apellido.trim();
   const rut = input.rut.trim().toUpperCase();
   const correo = input.correo.trim().toLowerCase();
-  const { password, carrera, telefono } = input;
+  const { carrera, telefono } = input;
 
   if (!RUT_REGEX.test(rut)) {
     throw { status: 400, message: 'El formato del RUT es inválido (Ej: 12.345.678-9).' };
@@ -70,16 +69,12 @@ export async function crearEstudiante(input: CrearEstudianteInput) {
     throw { status: 409, message: 'Ya existe un usuario registrado con ese correo.' };
   }
 
-  const passToHash = password || "123456";
-  const passwordHasheada = await bcrypt.hash(passToHash, 10);
-
   const nuevoEstudiante = await prisma.usuario.create({
     data: {
       nombre,
       apellido,
       rut,
       correo,
-      password: passwordHasheada,
       carrera: carrera?.trim(),
       telefono: telefono?.trim(),
       rol: RolUsuario.Estudiante,
@@ -102,7 +97,6 @@ export async function crearEstudiante(input: CrearEstudianteInput) {
 export async function crearEstudiantesBatch(inputs: CrearEstudianteInput[]) {
   if (inputs.length === 0) return { creados: [], errores: [] };
 
-  // 1. Una sola query para traer TODOS los duplicados posibles
   const ruts = inputs.map(i => i.rut);
   const correos = inputs.map(i => i.correo);
 
@@ -113,8 +107,9 @@ export async function crearEstudiantesBatch(inputs: CrearEstudianteInput[]) {
     select: { rut: true, correo: true },
   });
 
-  const rutsExistentes = new Set(existentes.map((u: { rut: string; correo: string }) => u.rut));
-  const correosExistentes = new Set(existentes.map((u: { rut: string; correo: string }) => u.correo));
+  // Corrección errores 1 y 2: Dejamos que TS infiera y filtramos los correos nulos
+  const rutsExistentes = new Set(existentes.map(u => u.rut));
+  const correosExistentes = new Set(existentes.map(u => u.correo).filter(Boolean));
 
   const validos: CrearEstudianteInput[] = [];
   const errores: { input: CrearEstudianteInput; message: string }[] = [];
@@ -129,19 +124,12 @@ export async function crearEstudiantesBatch(inputs: CrearEstudianteInput[]) {
     }
   }
 
-  const passwordsUnicas = new Set(validos.map(i => i.password || '123456'));
-  const hashCache = new Map<string, string>();
-  for (const pass of passwordsUnicas) {
-    hashCache.set(pass, await bcrypt.hash(pass, 10));
-  }
-
   const creados = await prisma.usuario.createManyAndReturn({
     data: validos.map(input => ({
       nombre: input.nombre,
       apellido: input.apellido,
       rut: input.rut,
       correo: input.correo,
-      password: hashCache.get(input.password || '123456')!,
       carrera: input.carrera,
       telefono: input.telefono,
       rol: RolUsuario.Estudiante,
@@ -253,7 +241,7 @@ export const obtenerHistorialAsistencia = async (rut: string) => {
 };
 
 export const actualizarPerfil = async (rutActual: string, datos: Partial<CrearEstudianteInput>) => {
-  const { rut: nuevoRut, correo: nuevoCorreo, password, nombre, apellido, carrera, telefono } = datos;
+  const { rut: nuevoRut, correo: nuevoCorreo, nombre, apellido, carrera, telefono } = datos;
 
   const estudianteActual = await prisma.usuario.findUnique({
     where: { rut: rutActual }
@@ -278,7 +266,7 @@ export const actualizarPerfil = async (rutActual: string, datos: Partial<CrearEs
     const usuarioConflicto = await prisma.usuario.findFirst({
       where: {
         AND: [
-          { id: { not: estudianteActual.id } }, // Excluye al estudiante que estamos editando
+          { id: { not: estudianteActual.id } },
           {
             OR: [
               ...(rutNormalizado ? [{ rut: rutNormalizado }] : []),
@@ -293,7 +281,8 @@ export const actualizarPerfil = async (rutActual: string, datos: Partial<CrearEs
       if (rutNormalizado && usuarioConflicto.rut.toUpperCase() === rutNormalizado) {
         throw { status: 409, message: 'Ya existe otro usuario registrado con ese RUT.' };
       }
-      if (correoNormalizado && usuarioConflicto.correo.toLowerCase() === correoNormalizado) {
+      // Corrección error 3: agregamos optional chaining (?.)
+      if (correoNormalizado && usuarioConflicto.correo?.toLowerCase() === correoNormalizado) {
         throw { status: 409, message: 'Ya existe otro usuario registrado con ese correo.' };
       }
     }
@@ -307,10 +296,6 @@ export const actualizarPerfil = async (rutActual: string, datos: Partial<CrearEs
   if (carrera !== undefined) updateData.carrera = carrera.trim();
   if (telefono !== undefined) updateData.telefono = telefono.trim();
 
-  if (password) {
-    const salt = await bcrypt.genSalt(10);
-    updateData.password = await bcrypt.hash(password, salt);
-  }
 
   return await prisma.usuario.update({
     where: { id: estudianteActual.id },

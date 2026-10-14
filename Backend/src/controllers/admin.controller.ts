@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
 import * as service from '../services/admin.service';
 
-// Interfaz para cuando integres el middleware de JWT que inyecta los datos del usuario
+// 1. Actualizamos la interfaz: El token del Admin ahora trae 'id' y 'correo' en lugar de 'rut'
 export interface AuthRequest extends Request {
   usuario?: {
-    rut: string; // Usaremos el RUT del token para saber quién es el admin actual
+    id: number;   
+    nombre: string;
+    correo: string;
     rol: string;
   };
 }
@@ -13,20 +15,19 @@ export const transferirAdministracion = async (req: AuthRequest, res: Response) 
   try {
     const { rutNuevoAdmin, palabraConfirmacion } = req.body;
     
-    // Asegurarse de que el middleware inyectó la información de sesión
-    if (!req.usuario || !req.usuario.rut) {
+    // 2. Verificamos que exista el ID en la sesión
+    if (!req.usuario || !req.usuario.id) {
       return res.status(401).json({ error: 'No autorizado. Token de sesión inválido.' });
     }
 
-    const rutAdminActual = req.usuario.rut;
+    const idAdminActual = req.usuario.id;
 
-    // Prevenir que un admin intente transferirse el mando a sí mismo por error
-    if (rutAdminActual === rutNuevoAdmin) {
-      return res.status(400).json({ error: 'No puedes transferir el mando a tu propia cuenta.' });
-    }
+    // Nota: Eliminamos la validación de "rutAdminActual === rutNuevoAdmin" 
+    // porque ahora no podemos comparar el ID de administrador con el RUT de un estudiante.
+    // Además, el servicio ya se encarga de validar si el nuevo candidato ya es administrador.
 
-    // Ejecutar el servicio
-    await service.transferirMando(rutAdminActual, rutNuevoAdmin, palabraConfirmacion);
+    // 3. Pasamos el idAdminActual (number) al servicio en lugar del rut
+    await service.transferirMando(idAdminActual, rutNuevoAdmin, palabraConfirmacion);
 
     res.json({ 
       mensaje: 'Traspaso de administración exitoso. Su sesión expirará ahora.' 

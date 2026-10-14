@@ -7,6 +7,14 @@ datasource db {
   provider = "postgresql"
 }
 
+model Administrador {
+  id       Int    @id @default(autoincrement())
+  nombre   String
+  correo   String @unique
+  password String
+}
+
+
 model Usuario {
   id               Int           @id @default(autoincrement())
   nombre           String
@@ -14,8 +22,7 @@ model Usuario {
   carrera          String        @default("")
   telefono         String        @default("")
   rut              String        @unique
-  correo           String        @unique
-  password         String
+  correo           String?       @unique
   rol              RolUsuario
   asistencias      Asistencia[]
   inscripciones    Inscripcion[]
@@ -46,12 +53,12 @@ model Taller {
 }
 
 model Inscripcion {
-  id            Int      @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   fechaRegistro DateTime @default(now())
-  estudianteId  Int
-  tallerId      Int
-  estudiante    Usuario  @relation(fields: [estudianteId], references: [id])
-  taller        Taller   @relation(fields: [tallerId], references: [id])
+  estudianteId Int
+  tallerId     Int
+  estudiante   Usuario  @relation(fields: [estudianteId], references: [id])
+  taller       Taller   @relation(fields: [tallerId], references: [id])
 
   @@unique([estudianteId, tallerId])
 }
@@ -81,8 +88,20 @@ model Asistencia {
   @@unique([sesionId, estudianteId])
 }
 
+
+model EventoExterno {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  descripcion String
+  fecha       DateTime @db.Date
+  horario     String
+  lugar       String   @default("Galpón Cultural")
+  organizador String
+  estado      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
 enum RolUsuario {
-  Administrador
   Profesor
   Ayudante
   Estudiante

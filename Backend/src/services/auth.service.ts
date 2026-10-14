@@ -12,34 +12,32 @@ if (!JWT_SECRET || !GOOGLE_CLIENT_ID) {
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
-export const autenticarUsuario = async (correo: string, passwordPlan: string) => {
-  const usuario = await prisma.usuario.findUnique({
+export const autenticarAdministrador = async (correo: string, passwordPlan: string) => {
+  // 1. Ahora buscamos en la tabla Administrador
+  const admin = await prisma.administrador.findUnique({
     where: { correo }
   });
 
-  if (!usuario) {
+  if (!admin) {
     throw new Error('Credenciales incorrectas');
   }
 
-  if (usuario.rol !== 'Administrador') {
-    throw new Error('Acceso denegado. Solo los administradores pueden iniciar sesión en este portal.');
-  }
-
-  const passwordCorrecto = await bcrypt.compare(passwordPlan, usuario.password);
+  // 2. Comparamos la contraseña de la tabla Administrador
+  const passwordCorrecto = await bcrypt.compare(passwordPlan, admin.password);
   
   if (!passwordCorrecto) {
     throw new Error('Credenciales incorrectas');
   }
 
+  // 3. Generamos el token solo con los datos que tiene el Administrador
+  // Inyectamos el rol manualmente para que el frontend lo reconozca
   const token = jwt.sign(
     { 
       user: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        apellido: usuario.apellido,
-        rol: usuario.rol,
-        rut: usuario.rut,
-        correo: usuario.correo
+        id: admin.id,
+        nombre: admin.nombre,
+        correo: admin.correo,
+        rol: 'Administrador' 
       }
     },
     JWT_SECRET,
@@ -50,41 +48,50 @@ export const autenticarUsuario = async (correo: string, passwordPlan: string) =>
 };
 
 export const registrarUsuario = async (datos: any) => { 
-  const salt = await bcrypt.genSalt(10);
-  const passwordHash = await bcrypt.hash(datos.password, salt);
-
+  // Los usuarios generales (Estudiantes, Profesores, Ayudantes) ya no tienen password.
+  // Solo se guardan sus datos de perfil y rol.
   const usuario = await prisma.usuario.create({
     data: {
       nombre: datos.nombre,
       apellido: datos.apellido,
       rut: datos.rut,
       correo: datos.correo,
-      password: passwordHash,
       rol: datos.rol 
     }
   });
 
-  const { password, ...usuarioSinPassword } = usuario;
-  return usuarioSinPassword;
+  return usuario;
 };
 
 export const validarToken = async (token: string) => {
   const decoded: any = jwt.verify(token, JWT_SECRET);
   
-  const usuario = await prisma.usuario.findUnique({
-    where: { id: decoded.user.id }, 
-    select: {
-      id: true,
-      nombre: true,
-      apellido: true,
-      rut: true,
-      correo: true,
-      rol: true
-    }
-  });
+  // Dependiendo de si el token es de un Administrador o un Usuario normal, buscamos en su respectiva tabla
+  if (decoded.user.rol === 'Administrador') {
+    const admin = await prisma.administrador.findUnique({
+      where: { id: decoded.user.id },
+      select: { id: true, nombre: true, correo: true }
+    });
+    
+    if (!admin) throw new Error('Administrador no encontrado');
+    return { ...admin, rol: 'Administrador' }; // Devolvemos el rol para el frontend
+    
+  } else {
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: decoded.user.id }, 
+      select: {
+        id: true,
+        nombre: true,
+        apellido: true,
+        rut: true,
+        correo: true,
+        rol: true
+      }
+    });
 
-  if (!usuario) throw new Error('Usuario no encontrado');
-  return usuario;
+    if (!usuario) throw new Error('Usuario no encontrado');
+    return usuario;
+  }
 };
 
 export const autenticarConGoogle = async (tokenGoogle: string) => {
@@ -109,18 +116,13 @@ export const autenticarConGoogle = async (tokenGoogle: string) => {
     throw error;
   }
 
-  const usuario = await prisma.usuario.findUnique({
+  // Ahora validamos si ese correo de Google pertenece a un Administrador
+  const admin = await prisma.administrador.findUnique({
     where: { correo }
   });
 
-  if (!usuario) {
-    const error: any = new Error('Tu correo institucional es válido, pero no estás registrado en el sistema.');
-    error.status = 404; 
-    throw error;
-  }
-
-  if (usuario.rol !== 'Administrador') {
-    const error: any = new Error('Acceso denegado. Solo los administradores pueden iniciar sesión en este portal.');
+  if (!admin) {
+    const error: any = new Error('Tu correo institucional es válido, pero no estás registrado como Administrador.');
     error.status = 403; 
     throw error;
   }
@@ -128,12 +130,10 @@ export const autenticarConGoogle = async (tokenGoogle: string) => {
   const token = jwt.sign(
     { 
       user: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        apellido: usuario.apellido,
-        rol: usuario.rol,
-        rut: usuario.rut,
-        correo: usuario.correo
+        id: admin.id,
+        nombre: admin.nombre,
+        correo: admin.correo,
+        rol: 'Administrador'
       }
     },
     JWT_SECRET,
@@ -141,22 +141,22 @@ export const autenticarConGoogle = async (tokenGoogle: string) => {
   );
 
   return token;
-  
 };
+
 export const solicitarRecuperacion = async (correo: string) => {
-  const usuario = await prisma.usuario.findUnique({
+  // Ahora la recuperación de contraseña es solo para administradores
+  const admin = await prisma.administrador.findUnique({
     where: { correo }
   });
 
-  // No revelar si el correo existe
-  if (!usuario || usuario.rol !== "Administrador") {
-    return;
+  if (!admin) {
+    return; // No revelar si el correo existe
   }
 
   const token = jwt.sign(
     {
       type: "password-reset",
-      userId: usuario.id
+      userId: admin.id
     },
     JWT_SECRET,
     { expiresIn: "15m" }
@@ -164,6 +164,7 @@ export const solicitarRecuperacion = async (correo: string) => {
 
   return token;
 };
+
 export const restablecerContrasena = async (
   token: string,
   nuevaPassword: string
@@ -177,19 +178,19 @@ export const restablecerContrasena = async (
     throw new Error("Token inválido");
   }
 
-  const usuario = await prisma.usuario.findUnique({
+  const admin = await prisma.administrador.findUnique({
     where: { id: payload.userId }
   });
 
-  if (!usuario) {
-    throw new Error("Usuario no encontrado");
+  if (!admin) {
+    throw new Error("Administrador no encontrado");
   }
 
   const salt = await bcrypt.genSalt(10);
   const passwordHash = await bcrypt.hash(nuevaPassword, salt);
 
-  await prisma.usuario.update({
-    where: { id: usuario.id },
+  await prisma.administrador.update({
+    where: { id: admin.id },
     data: {
       password: passwordHash
     }
