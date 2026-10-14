@@ -1,6 +1,6 @@
 import request from 'supertest';
-import app from '../src/index'; // Ajusta la ruta a tu app Express
-import { prisma } from '../src/lib/prisma';
+import app from '../index'; // Ajusta la ruta a tu app Express
+import { prisma } from '../lib/prisma';
 import jwt from 'jsonwebtoken';
 
 // 1. Mockeamos las funciones específicas de Prisma que usa el servicio de métricas

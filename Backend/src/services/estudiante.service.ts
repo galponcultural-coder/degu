@@ -328,7 +328,7 @@ export const actualizarPerfil = async (rutActual: string, datos: Partial<CrearEs
   });
 };
 
-export const obtenerHistorialAyudantias = async (rut: string) => {
+export const obtenerHistorialAyudantias = async (rut: string, filtro?: string) => {
   const rutNormalizado = rut.trim().toUpperCase();
 
   const usuario = await prisma.usuario.findFirst({
@@ -376,29 +376,60 @@ export const obtenerHistorialAyudantias = async (rut: string) => {
     throw { status: 404, message: 'Estudiante no encontrado.' };
   }
 
-  const historial = usuario.inscripciones.map((item: any) => ({
-    tallerId: item.taller.id,
-    taller: item.taller.nombre,
-    semestre: item.taller.semestre,
-    horario: item.taller.horario,
-    dia: item.taller.dia,
-    bloque: item.taller.bloque,
-    lugar: item.taller.lugar,
-    activo: item.taller.estado,
-    profesor: item.taller.profesor
-      ? `${item.taller.profesor.nombre} ${item.taller.profesor.apellido}`
-      : null,
-  }));
+  switch (filtro?.toLowerCase()) {
+    
+    case 'semestres':
+      const semestres = [...new Set(usuario.inscripciones.map((item: any) => item.taller.semestre))];
+      return { total: semestres.length, semestres };
 
-  return {
-    estudiante: {
-      id: usuario.id,
-      nombre: usuario.nombre,
-      apellido: usuario.apellido,
-      rut: usuario.rut,
-      rol: usuario.rol,
-    },
-    totalAyudantias: historial.length,
-    historial,
-  };
+    case 'talleres':
+      const talleres = usuario.inscripciones.map((item: any) => ({
+        tallerId: item.taller.id,
+        taller: item.taller.nombre,
+        semestre: item.taller.semestre,
+        activo: item.taller.estado,
+        profesor: item.taller.profesor
+          ? `${item.taller.profesor.nombre} ${item.taller.profesor.apellido}`
+          : null,
+      }));
+      return { total: talleres.length, talleres };
+
+    case 'horarios':
+      const horarios = usuario.inscripciones.map((item: any) => ({
+        tallerId: item.taller.id,
+        taller: item.taller.nombre,
+        dia: item.taller.dia,
+        bloque: item.taller.bloque,
+        horario: item.taller.horario,
+        lugar: item.taller.lugar,
+      }));
+      return { total: horarios.length, horarios };
+
+    default:
+      const historial = usuario.inscripciones.map((item: any) => ({
+        tallerId: item.taller.id,
+        taller: item.taller.nombre,
+        semestre: item.taller.semestre,
+        horario: item.taller.horario,
+        dia: item.taller.dia,
+        bloque: item.taller.bloque,
+        lugar: item.taller.lugar,
+        activo: item.taller.estado,
+        profesor: item.taller.profesor
+          ? `${item.taller.profesor.nombre} ${item.taller.profesor.apellido}`
+          : null,
+      }));
+
+      return {
+        estudiante: {
+          id: usuario.id,
+          nombre: usuario.nombre,
+          apellido: usuario.apellido,
+          rut: usuario.rut,
+          rol: usuario.rol,
+        },
+        totalAyudantias: historial.length,
+        historial,
+      };
+  }
 };

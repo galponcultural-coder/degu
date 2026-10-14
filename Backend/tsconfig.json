@@ -7,11 +7,10 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["jest", "node"],
+    "types": ["jest", "node"]
   },
   "include": ["src/**/*"],
   "exclude": [
-    "tests",
     "prisma",
     "database"
   ]

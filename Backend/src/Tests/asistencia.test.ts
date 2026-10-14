@@ -1,6 +1,6 @@
 import request from 'supertest';
 import express from 'express';
-import asistenciaRoutes from '../src/routes/asistencia.routes';
+import asistenciaRoutes from '../routes/asistencia.routes';
 import { PrismaClient } from '@prisma/client'; 
 
 const app = express();

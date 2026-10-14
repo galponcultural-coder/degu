@@ -1,5 +1,5 @@
-import { autenticarConGoogle } from '../src/services/auth.service';
-import { prisma } from '../src/lib/prisma';
+import { autenticarConGoogle } from '../services/auth.service';
+import { prisma } from '../lib/prisma';
 import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 
