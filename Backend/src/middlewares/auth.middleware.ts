@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { RolUsuario } from '@prisma/client'
 
 export interface AuthRequest extends Request {
   usuario?: {
-    rut: string;
+    id?: number;
+    rut?: string;
     rol: string;
+    correo?: string;
     [key: string]: any; 
   };
 }
@@ -52,7 +53,7 @@ export const middlewareVerificarAdmin = (req: AuthRequest, res: Response, next: 
     const decoded = jwt.verify(token, secreto) as any;
     const userData = decoded.user ? decoded.user : decoded;
 
-    if (userData.rol !== RolUsuario.Administrador && userData.rol !== 'Administrador') {
+    if (userData.rol !== 'Administrador') {
       return res.status(403).json({ 
         error: 'Acceso denegado. Esta acción requiere permisos de Administrador.' 
       });

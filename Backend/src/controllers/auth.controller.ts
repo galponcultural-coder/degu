@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { autenticarUsuario, registrarUsuario, validarToken, autenticarConGoogle, restablecerContrasena, solicitarRecuperacion } from '../services/auth.service';
+import { autenticarAdministrador, registrarUsuario, validarToken, autenticarConGoogle, restablecerContrasena, solicitarRecuperacion } from '../services/auth.service';
 
 export const login = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -10,7 +10,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const token = await autenticarUsuario(correo, password);
+    const token = await autenticarAdministrador(correo, password);
 
     res.status(200).json({
       mensaje: 'Inicio de sesión exitoso',

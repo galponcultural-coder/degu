@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import * as service from '../services/estudiante.service';
+import { prisma } from '../lib/prisma'; // Importado para cambiarRol
+import { RolUsuario } from '@prisma/client';
 
 export const listarEstudiantes = async (req: Request, res: Response) => {
   try {
@@ -14,11 +16,12 @@ export const listarEstudiantes = async (req: Request, res: Response) => {
 
 export const crearEstudiante = async (req: Request, res: Response) => {
   try {
-    const { nombre, apellido, rut, correo, carrera, telefono, rol } = req.body;
+    const { nombre, apellido, rut, correo, carrera, telefono } = req.body;
 
-    if (!nombre || !apellido || !rut || !correo || !carrera || !telefono || !rol) {
+    // Eliminada la exigencia de 'password' y 'rol'
+    if (!nombre || !apellido || !rut || !correo || !carrera || !telefono ) {
       return res.status(400).json({
-        error: 'Faltan campos obligatorios: nombre, apellido, rut, correo, password.',
+        error: 'Faltan campos obligatorios: nombre, apellido, rut, correo, carrera, telefono.',
       });
     }
 
@@ -94,7 +97,7 @@ export async function buscarEstudiantesController(req: Request, res: Response) {
       meta: {
         page,
         limit,
-        total,           
+        total,          
         totalPages,       
         hasNextPage: pageNum < totalPages,
         hasPrevPage: pageNum > 1,
@@ -145,11 +148,30 @@ export const cambiarRol = async (req: Request, res: Response) => {
     const { rut } = req.params;
     const { rol } = req.body;
     
-    const actualizado = await service.actualizarPerfil(rut as string, rol);
-    res.json(actualizado);
+    // Validación rápida para asegurar que no intenten inyectar "Administrador" u otro rol inválido
+    if (!Object.values(RolUsuario).includes(rol)) {
+      return res.status(400).json({ error: 'Rol inválido proporcionado.' });
+    }
+
+    // Actualizamos el rol directamente usando Prisma
+    const actualizado = await prisma.usuario.update({
+      where: { rut: rut as string },
+      data: { rol: rol as RolUsuario },
+      select: { id: true, nombre: true, apellido: true, rut: true, rol: true }
+    });
+
+    res.json({
+      mensaje: `Rol actualizado correctamente a ${rol}`,
+      usuario: actualizado
+    });
   } catch (error: any) {
     console.error("=== ERROR REAL AL CAMBIAR ROL ===", error); 
     
+    // Si falla porque el RUT no existe, Prisma arroja el código P2025
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Estudiante no encontrado.' });
+    }
+
     res.status(400).json({ 
       error: 'Error al cambiar rol', 
       detalle: error.message,
@@ -161,7 +183,6 @@ export const cambiarRol = async (req: Request, res: Response) => {
 export const obtenerHistorialAyudantias = async (req: Request, res: Response) => {
   try {
     const rut = String(req.params.rut);
-    
     const filtro = req.query.filtro ? String(req.query.filtro) : undefined;
 
     const resultado = await service.obtenerHistorialAyudantias(rut, filtro);

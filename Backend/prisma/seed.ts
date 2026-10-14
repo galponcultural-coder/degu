@@ -1,5 +1,5 @@
 import { prisma } from '../src/lib/prisma';
-import { randomUUID } from 'crypto'; 
+import crypto from 'crypto'; 
 import bcrypt from 'bcrypt'; 
 
 async function main() {
@@ -11,31 +11,34 @@ async function main() {
     await prisma.sesion.deleteMany();
     await prisma.inscripcion.deleteMany();
     await prisma.taller.deleteMany();
+    await prisma.grupoTaller.deleteMany();
     await prisma.usuario.deleteMany();
+    await prisma.administrador.deleteMany();
+    await prisma.eventoExterno.deleteMany();
 
     console.log('🔐 Encriptando contraseñas por defecto...');
     const passwordHasheada = await bcrypt.hash('password123', 10);
 
-    console.log('👨‍🏫 Creando usuarios (Administrador y Equipo de Estudiantes)...');
-    const profesor = await prisma.usuario.create({
+    console.log('👨‍💼 Creando Administrador del sistema...');
+    // El administrador ahora vive en su propia tabla
+    await prisma.administrador.create({
       data: {
-        nombre: "Edgar",
-        apellido: "Gallardo",
-        rut: "12.345.678-9",
+        nombre: "Edgar Gallardo",
         correo: "galponcultural@ucn.cl",
         password: passwordHasheada, 
-        rol: "Administrador" 
       }
     });
 
+    console.log('👨‍🏫 Creando Profesores...');
     const profesoresData = [
       { nombre: "Andrés", apellido: "Morales", carrera: "N/A", telefono: "+56922222222", rut: "22.222.222-2", correo: "andres.morales@ucn.cl", rol: "Profesor" as const },
       { nombre: "Valentina", apellido: "Soto", carrera: "N/A", telefono: "+56933333333", rut: "33.333.333-3", correo: "valentina.soto@ucn.cl", rol: "Profesor" as const },
       { nombre: "Ignacio", apellido: "Vera", carrera: "N/A", telefono: "+56944444444", rut: "44.444.444-4", correo: "ignacio.vera@ucn.cl", rol: "Profesor" as const },
     ];
 
+    // Ya no inyectamos "password" a los profesores
     const profesores = await Promise.all(
-      profesoresData.map((p) => prisma.usuario.create({ data: { ...p, password: passwordHasheada } }))
+      profesoresData.map((p) => prisma.usuario.create({ data: { ...p } }))
     );
     const [profAndres, profValentina, profIgnacio] = profesores;
 
@@ -50,9 +53,10 @@ async function main() {
       { nombre: "Javiera", apellido: "Cortés", carrera: "Ingeniería Civil", telefono: "+56955555557", rut: "20.777.777-7", correo: "javiera.cortes@alumnos.ucn.cl" },
     ];
 
+    // Ya no inyectamos "password" a los estudiantes
     const estudiantes = await Promise.all(
       estudiantesData.map((e) =>
-        prisma.usuario.create({ data: { ...e, password: passwordHasheada, rol: "Estudiante" } })
+        prisma.usuario.create({ data: { ...e, rol: "Estudiante" } })
       )
     );
     const [camila, diego, fernanda, sebastian, antonia, tomas, javiera] = estudiantes;
@@ -70,7 +74,6 @@ async function main() {
 
     console.log('📚 Abriendo catálogo de talleres (semestre 2026-2, semestre actual)...');
 
-    // 👇 Ejemplo de GrupoTaller: "Cueca" se dicta en 3 bloques distintos, mismos alumnos en los 3
     const grupoCueca = await prisma.grupoTaller.create({ data: {} });
 
     const tallerCuecaLunes = await prisma.taller.create({
@@ -82,7 +85,7 @@ async function main() {
     const tallerCuecaViernes = await prisma.taller.create({
       data: { nombre: "Cueca", descripcion: "Baile tradicional chileno, nivel inicial.", horario: "Viernes 12:00 - 13:00", dia: 5, bloque: "C", semestre: "2026-2", lugar: "Salón Graciela Ramos (Sala de Espejos)", profesorId: profValentina.id, grupoId: grupoCueca.id }
     });
-    // 👇 NUEVO: ejemplo de grupo con 2 bloques
+
     const grupoYoga = await prisma.grupoTaller.create({ data: {} });
 
     const tallerYogaMartes = await prisma.taller.create({
@@ -108,9 +111,7 @@ async function main() {
       { estudianteId: antonia.id, tallerId: tallerCeramica.id },
       { estudianteId: tomas.id, tallerId: tallerCeramica.id },
 
-      // 2026-2 — grupo Cueca: se inscriben una vez por bloque elegido, pero
-      // en la práctica esto ya lo hace inscribirEstudiante() automáticamente
-      // vía QR; acá lo dejamos explícito para tener datos de prueba completos
+      // 2026-2 
       { estudianteId: camila.id, tallerId: tallerCuecaLunes.id },
       { estudianteId: camila.id, tallerId: tallerCuecaMiercoles.id },
       { estudianteId: camila.id, tallerId: tallerCuecaViernes.id },
@@ -119,7 +120,6 @@ async function main() {
       { estudianteId: javiera.id, tallerId: tallerCuecaMiercoles.id },
       { estudianteId: javiera.id, tallerId: tallerCuecaViernes.id },
 
-      // Grupo Yoga (2 bloques) — Sebastián y Antonia en ambos
       { estudianteId: sebastian.id, tallerId: tallerYogaMartes.id },
       { estudianteId: sebastian.id, tallerId: tallerYogaJueves.id },
 
@@ -137,7 +137,7 @@ async function main() {
 
     console.log('⏰ Generando sesiones activas...');
     const ahora = new Date();
-    const validez = new Date(ahora.getTime() + 60 * 60000); // 1 hora de validez
+    const validez = new Date(ahora.getTime() + 60 * 60000); 
 
     // 2026-1
     const sesionAjedrez = await prisma.sesion.create({ data: { tallerId: tallerAjedrez.id, fecha: ahora, bloque: 2, qrToken: crypto.randomUUID(), validoHasta: validez } });
@@ -151,6 +151,7 @@ async function main() {
     const sesionFotografia = await prisma.sesion.create({ data: { tallerId: tallerFotografia.id, fecha: ahora, bloque: 1, qrToken: crypto.randomUUID(), validoHasta: validez } });
     const sesionYogaMartes = await prisma.sesion.create({ data: { tallerId: tallerYogaMartes.id, fecha: ahora, bloque: 1, qrToken: crypto.randomUUID(), validoHasta: validez } });
     const sesionYogaJueves = await prisma.sesion.create({ data: { tallerId: tallerYogaJueves.id, fecha: ahora, bloque: 1, qrToken: crypto.randomUUID(), validoHasta: validez } });
+    
     console.log('🙋 Registrando asistencias y encuestas de satisfacción...');
 
     // 2026-1
@@ -169,7 +170,7 @@ async function main() {
       { sesionId: sesionCeramica.id, estudianteId: tomas.id, estado: "Ausente" },
     ]});
 
-    // 2026-2 — semestre actual
+    // 2026-2
     await prisma.asistencia.createMany({ data: [
       { sesionId: sesionCuecaLunes.id, estudianteId: camila.id, estado: "Presente", notaSatisfaccion: 5 },
       { sesionId: sesionCuecaLunes.id, estudianteId: javiera.id, estado: "Presente", notaSatisfaccion: 5 },
@@ -181,14 +182,15 @@ async function main() {
     ]});
 
     await prisma.asistencia.createMany({ data: [
-  { sesionId: sesionYogaMartes.id, estudianteId: sebastian.id, estado: "Presente", notaSatisfaccion: 5 },
-  { sesionId: sesionYogaMartes.id, estudianteId: antonia.id, estado: "Presente", notaSatisfaccion: 4 },
-  ]});
+      { sesionId: sesionYogaMartes.id, estudianteId: sebastian.id, estado: "Presente", notaSatisfaccion: 5 },
+      { sesionId: sesionYogaMartes.id, estudianteId: antonia.id, estado: "Presente", notaSatisfaccion: 4 },
+    ]});
 
-  await prisma.asistencia.createMany({ data: [
-    { sesionId: sesionYogaJueves.id, estudianteId: sebastian.id, estado: "Ausente" },
-    { sesionId: sesionYogaJueves.id, estudianteId: antonia.id, estado: "Presente", notaSatisfaccion: 5 },
-  ]});
+    await prisma.asistencia.createMany({ data: [
+      { sesionId: sesionYogaJueves.id, estudianteId: sebastian.id, estado: "Ausente" },
+      { sesionId: sesionYogaJueves.id, estudianteId: antonia.id, estado: "Presente", notaSatisfaccion: 5 },
+    ]});
+
     await prisma.asistencia.createMany({ data: [
       { sesionId: sesionTeatro.id, estudianteId: diego.id, estado: "Presente", notaSatisfaccion: 4 },
       { sesionId: sesionTeatro.id, estudianteId: fernanda.id, estado: "Presente", notaSatisfaccion: 5 },
@@ -203,7 +205,7 @@ async function main() {
     console.log('✅ Seed completado.');
     console.log('----------------------------------------------------');
     console.log('Inicia sesión con:');
-    console.log('Correo: carolina.reyes@ucn.cl');
+    console.log('Correo: galponcultural@ucn.cl');
     console.log('Clave:  password123');
     console.log('----------------------------------------------------');
 
