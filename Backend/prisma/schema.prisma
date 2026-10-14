@@ -99,6 +99,9 @@ model EventoExterno {
   organizador String
   estado      Boolean  @default(true)
   createdAt   DateTime @default(now())
+  asistentesEstudiantes  Int      @default(0) 
+  asistentesFuncionarios Int      @default(0) 
+  asistentesExternos     Int      @default(0)
 }
 
 enum RolUsuario {
