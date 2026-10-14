@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import FormularioAsistencia from './components/formularioAsistencia';
+import FormularioAsistenciaEvento from './components/formularioAsistenciaEvento';
 import Talleres from './pages/Talleres';
 import Inicio from './pages/Inicio';
 import Horario from './pages/Horario';
@@ -27,6 +28,7 @@ function App() {
           </Route>
 
           <Route path='/formularioAsistencia' element={<FormularioAsistencia />} />
+          <Route path='/formularioAsistenciaEvento' element={<FormularioAsistenciaEvento />} />
           
           {/* ======================================= */}
           {/* RUTAS PRIVADAS (Requieren token válido) */}
